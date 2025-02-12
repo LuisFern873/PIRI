@@ -1,4 +1,6 @@
 import os
+import requests
+import base64
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import openai
@@ -7,26 +9,107 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 
-PROMPT_INICIAL = "Actúa como un chatbot en español y Shipibo, brindando recomendaciones sobre embarazo, prevención de enfermedades, cuidado prenatal, alimentación, higiene y vacunación. Ofrece consejos claros y culturalmente apropiados, y explica cuándo buscar atención médica. Responde según la preferencia del usuario."
+PROMPT_INICIAL = "Actúa como un chatbot en español y Shipibo, brindando recomendaciones sobre embarazo, prevención de enfermedades, cuidado prenatal, alimentación, higiene y vacunación. También puedes analizar imágenes médicas y proporcionar información relevante."
 
-def get_chatgpt_response(user_message):
+historial_usuarios = {}
+
+def encode(image_url):
+
+    TWILIO_SID = os.getenv("TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+
+    try:
+        response = requests.get(image_url, auth=(TWILIO_SID, TWILIO_AUTH_TOKEN))
+        print(f"response.status_code: {response.status_code}")
+
+        if response.status_code == 200:
+            imagen_base64 = base64.b64encode(response.content).decode("utf-8")
+            return f"data:image/jpeg;base64,{imagen_base64}"
+        else:
+            return f"Error: No se pudo descargar la imagen. Código {response.status_code}"
+    except Exception as e:
+        return f"Error en la descarga: {str(e)}"
+
+
+def analize_image(user_id, image_url):
+
+    imagen_base64 = encode(image_url)
+
+    if not imagen_base64:
+        return "Error: No se pudo descargar o procesar la imagen."
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4-turbo",
+            messages=[
+                {"role": "system", "content": PROMPT_INICIAL},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Aquí tienes una imagen, analízal. Brinda una respuesta bastante breve por favor."},
+                        {"type": "image_url", "image_url": {"url": imagen_base64}}
+                    ]
+                }
+            ]
+        )
+        print(response["choices"][0]["message"]["content"])
+
+        return response["choices"][0]["message"]["content"]
+    
+    except Exception as e:
+        return f"Error al analizar la imagen: {str(e)}"
+
+def get_chatgpt_response(user_id, user_message):
+
+    if user_id not in historial_usuarios:
+        historial_usuarios[user_id] = [{"role": "system", "content": PROMPT_INICIAL}]
+
+    historial_usuarios[user_id].append({"role": "user", "content": user_message})
+
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": PROMPT_INICIAL},
-                  {"role": "user", "content": user_message}]
+        model="gpt-4-turbo",
+        messages=historial_usuarios[user_id]
     )
-    return response["choices"][0]["message"]["content"]
+
+    bot_response = response["choices"][0]["message"]["content"]
+    historial_usuarios[user_id].append({"role": "assistant", "content": bot_response})
+
+    return bot_response
+
+def divide_message(mensaje, limite=320):
+    parts = []
+    while len(mensaje) > limite:
+        cut = mensaje.rfind("\n", 0, limite)
+        if cut == -1:
+            cut = limite
+        parts.append(mensaje[:cut])
+        mensaje = mensaje[cut:].strip()
+    parts.append(mensaje)
+    return parts
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    # Maneja mensajes entrantes de WhatsApp
+    user_id = request.values.get("From", "")
     incoming_msg = request.values.get("Body", "").strip()
-    response_text = get_chatgpt_response(incoming_msg)
+    media_url = request.values.get("MediaUrl0", None)
 
-    # Responder al usuario en WhatsApp
+    print(f"media_url: {media_url}")
+
+    if media_url:
+        response_text = analize_image(user_id, media_url)
+    else:
+        response_text = get_chatgpt_response(user_id, incoming_msg)
+    
+    messages = divide_message(response_text)
     resp = MessagingResponse()
-    resp.message(response_text)
+
+    for parte in messages:
+        resp.message(parte)
+    
     return str(resp)
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)
+
+
+
