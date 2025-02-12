@@ -4,12 +4,6 @@
   <img src="images/piri.png" width="400px">
 </div>
 
-<div style="text-align: center;">
-  <img src="images/demo1.jpg" width="200px" style="margin: 10px;">
-  <img src="images/demo2.jpg" width="200px" style="margin: 10px;">
-</div>
-
-
 ## Desarrollo  
 
 ### 1. Crear cuentas en OpenAI y Twilio  
@@ -90,6 +84,13 @@ https://9452-45-236-45-57.ngrok-free.app
 Guarda esta URL, ya que será necesaria para configurar el webhook en Twilio
 
 <img src="images/twilio.png">
+
+## Demo
+
+<div style="text-align: center;">
+  <img src="images/demo1.jpg" width="200px" style="margin: 10px;">
+  <img src="images/demo2.jpg" width="200px" style="margin: 10px;">
+</div>
 
 
 
