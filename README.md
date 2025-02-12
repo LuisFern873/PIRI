@@ -4,6 +4,12 @@
   <img src="images/piri.png" width="400px">
 </div>
 
+<div style="text-align: center;">
+  <img src="images/demo1.jpg" width="200px" style="margin: 10px;">
+  <img src="images/demo2.jpg" width="200px" style="margin: 10px;">
+</div>
+
+
 ## Desarrollo  
 
 ### 1. Crear cuentas en OpenAI y Twilio  
