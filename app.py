@@ -9,7 +9,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 
-PROMPT_INICIAL = "Actúa como un chatbot en español y Shipibo, brindando recomendaciones sobre embarazo, prevención de enfermedades, cuidado prenatal, alimentación, higiene y vacunación. También puedes analizar imágenes médicas y proporcionar información relevante."
+PROMPT_INICIAL = "Actúa como un chatbot en español y Shipibo, brindando recomendaciones sobre embarazo, prevención de enfermedades, cuidado prenatal, alimentación, higiene y vacunación. También puedes analizar imágenes médicas y brindar respuestas breves. Procura que tus respuestas a imágenes sean lo más concisas posibles."
 
 historial_usuarios = {}
 
@@ -39,27 +39,34 @@ def analize_image(user_id, image_url):
         return "Error: No se pudo descargar o procesar la imagen."
 
     try:
+
+        if user_id not in historial_usuarios:
+            historial_usuarios[user_id] = [{"role": "system", "content": PROMPT_INICIAL}]
+
+        historial_usuarios[user_id].append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Observa la imagen. Brinda una respuesta bastante breve por favor."},
+                {"type": "image_url", "image_url": {"url": imagen_base64}}
+            ]
+        })
+
         response = openai.ChatCompletion.create(
             model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": PROMPT_INICIAL},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Aquí tienes una imagen, analízal. Brinda una respuesta bastante breve por favor."},
-                        {"type": "image_url", "image_url": {"url": imagen_base64}}
-                    ]
-                }
-            ]
+            messages=historial_usuarios[user_id]
         )
-        print(response["choices"][0]["message"]["content"])
 
-        return response["choices"][0]["message"]["content"]
+        bot_response = response["choices"][0]["message"]["content"]
+        historial_usuarios[user_id].append({"role": "assistant", "content": bot_response})
+
+        print(bot_response)
+
+        return bot_response
     
     except Exception as e:
         return f"Error al analizar la imagen: {str(e)}"
 
-def get_chatgpt_response(user_id, user_message):
+def get_response(user_id, user_message):
 
     if user_id not in historial_usuarios:
         historial_usuarios[user_id] = [{"role": "system", "content": PROMPT_INICIAL}]
@@ -98,14 +105,11 @@ def webhook():
     if media_url:
         response_text = analize_image(user_id, media_url)
     else:
-        response_text = get_chatgpt_response(user_id, incoming_msg)
+        response_text = get_response(user_id, incoming_msg)
     
-    messages = divide_message(response_text)
+    print(response_text)
     resp = MessagingResponse()
-
-    for parte in messages:
-        resp.message(parte)
-    
+    resp.message(response_text)
     return str(resp)
 
 if __name__ == "__main__":
