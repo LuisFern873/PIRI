@@ -1,7 +1,15 @@
 # PIRI: Atención prenatal, apoyo total.
 
+Tu acompañante en la maternidad en WhatsApp y Telegram: pregunta, conversa y monitorea.
+
 <div style="text-align: center;">
   <img src="images/piri.png" width="400px">
+</div>
+
+## Arquitectura de solución
+
+<div style="text-align: center;">
+  <img src="images/solution.png">
 </div>
 
 ## Desarrollo  
